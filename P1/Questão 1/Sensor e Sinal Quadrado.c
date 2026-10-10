@@ -16,7 +16,7 @@
 // Configurações do Microcontrolador
 #pragma config FOSC = XT  // Oscilador a Cristal (necessário para os 4MHz)
 #pragma config WDTE = OFF // Desativa o Watchdog Timer (evita resets indesejados)
-#pragma config PWRTE = ON // Ativa o Power-up Timer
+#pragma config PWRTE = OFF // Desativa o Power-up Timer
 #pragma config CP = OFF   // Desativa a proteção de código
 
 #define _XTAL_FREQ 4000000 // Clock de 4 MHz exigido
@@ -42,7 +42,7 @@ void main(void) {
         }
         
         // Gera o sinal quadrado de 4Hz em RA0
-        PORTAbits.RA0 = ~PORTAbits.RA0; // Inverte o estado do pino
+        PORTAbits.RA0 ^= 1;             // Inverte o estado do pino
         __delay_ms(125);                // Atraso de meia onda (125ms + 125ms = 250ms = 4Hz)
     }
 }
