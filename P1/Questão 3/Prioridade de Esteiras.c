@@ -17,7 +17,7 @@
 // Configurações do Microcontrolador
 #pragma config FOSC = XT  // Oscilador a Cristal (necessário para os 4MHz)
 #pragma config WDTE = OFF // Desativa o Watchdog Timer (evita resets indesejados)
-#pragma config PWRTE = ON // Ativa o Power-up Timer
+#pragma config PWRTE = OFF // Desativa o Power-up Timer
 #pragma config CP = OFF   // Desativa a proteção de código
 
 #include <pic16f84a.h>
