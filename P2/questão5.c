@@ -32,11 +32,8 @@
 #include "PE_Const.h"
 #include "IO_Map.h"
 
-/* User includes (#include below this line is not maintained by Processor Expert) */
 
-/* ===================================================================
-** MAQUINA DE ESTADOS E MEMÓRIA DE CONTROLE (Escopo Global)
-** =================================================================== */
+/* Definição dos Estados Operacionais (Máquina de Estados) */
 #define ESTADO_DESLIGADO  0
 #define ESTADO_ENCHENDO   1
 #define ESTADO_OPERANDO   2  
@@ -47,24 +44,26 @@ unsigned char I_anterior = 0;
 
 void main(void)
 {
+  /* Variáveis lógicas normalizadas (1 = Ativo, 0 = Inativo) */
   unsigned char I, A, B, C, D;
+
   /*** Processor Expert internal initialization. DON'T REMOVE THIS CODE!!! ***/
   PE_low_level_init();
   /*** End of Processor Expert internal initialization.                    ***/
 
-  /* CICLO INFINITO DE EXECUÇÃO */
+  /* LAÇO INFINITO DE VARREDURA DA BANCADA REAL */
   for(;;) {
-  
-      /* ===================================================================
-      ** 1. LEITURA E NORMALIZAÇÃO DAS ENTRADAS (Tratamento de Active-Low)
-      ** Como BOTAO_I (Switch) e SENSOR_A (SW1) enviam 0 quando ativos,
-      ** usamos a exclamacao (!) para transformá-los em 1 dentro do software.
-      ** =================================================================== */
-      I = !BOTAO_I_GetVal();   // Se o Switch fechar p/ GND (0), I vira 1 (Ativo)
-      A = !SENSOR_A_GetVal();  // Se segurar o botão SW1 (0), A vira 1 (Ativo)
       
-      /* Se os sensores B, C e D forem sensores normais que enviam 1 com água, 
-         mantenha-os assim. Se forem chaves para o GND também, adicione ! neles. */
+      /* ===================================================================
+      ** 1. REORDENAÇÃO E CORREÇÃO ELÉTRICA DOS PINOS
+      ** Trocamos as leituras para casar com o comportamento real da placa:
+      ** Como segurar SW1 (SENSOR_A) liga a entrada, ele é o verdadeiro Botão I!
+      ** O Switch de retenção (BOTAO_I) passa a atuar como o sensor de topo A.
+      ** =================================================================== */
+      I = !SENSOR_A_GetVal();  // SW1 pressionado (0) ativa o comando de ligar (I = 1)
+      A = !BOTAO_I_GetVal();   // O Switch ligado (0) passa a simular o sensor de topo A (A = 1)
+      
+      /* Mantemos a leitura normalizada dos sensores de nível intermediários */
       B = SENSOR_B_GetVal() ? 1 : 0;
       C = SENSOR_C_GetVal() ? 1 : 0;
       D = SENSOR_D_GetVal() ? 1 : 0;
@@ -80,18 +79,17 @@ void main(void)
       else {
           LED_ALARME_SetVal();  // DESLIGADO (Apaga Alarme - Nível Alto)
 
-          /* 3. LÓGICA DO SWITCH OPERANDO COMO INTERRUPTOR DIRETO (LIGA/DESLIGA)
-             Como o Botão I é um switch (retém a posição), removemos a detecção de borda
-             de pulso. O sistema liga se o switch estiver em 1 e vai para parada se estiver em 0 */
-          if (I == 1) {
+          /* 3. LÓGICA DO BOTÃO OPERANDO POR PULSO (TOGGLE)
+             Como o comando I agora está no botão SW1 (pulso), a detecção de borda 
+             de subida garante que pressionar uma vez liga e pressionar de novo desliga */
+          if (I == 1 && I_anterior == 0) {
               if (estado_atual == ESTADO_DESLIGADO || estado_atual == ESTADO_PARADA) {
                   estado_atual = ESTADO_ENCHENDO;
-              }
-          } else {
-              if (estado_atual == ESTADO_ENCHENDO || estado_atual == ESTADO_OPERANDO) {
+              } else {
                   estado_atual = ESTADO_PARADA;
               }
           }
+          I_anterior = I; // Atualiza o histórico do botão
 
           /* 4. MÁQUINA DE ESTADOS HIDRÁULICA DO RESERVATÓRIO */
           switch (estado_atual) {
@@ -102,9 +100,10 @@ void main(void)
                   break;
 
               case ESTADO_ENCHENDO:
-                  VALV_EVE_ClrVal(); // LIGA Entrada (Abre válvula)
-                  VALV_EVS_SetVal(); // DESLIGA Saída (Fecha válvula)
+                  VALV_EVE_ClrVal(); // LIGA Entrada (Abre válvula de entrada)
+                  VALV_EVS_SetVal(); // DESLIGA Saída (Fecha válvula de saída)
                   
+                  /* Se o nível atingir B, passa para o regime operacional */
                   if (B) {
                       estado_atual = ESTADO_OPERANDO;
                   }
@@ -113,9 +112,9 @@ void main(void)
               case ESTADO_OPERANDO:
                   /* Regra da Válvula de Entrada (EVE) */
                   if (A) {
-                      VALV_EVE_SetVal(); // Cheio (SW1 pressionado): DESLIGA Entrada
+                      VALV_EVE_SetVal(); // Se o Switch (A) for ativado (Cheio): DESLIGA Entrada
                   } else {
-                      VALV_EVE_ClrVal(); // LIGA Entrada
+                      VALV_EVE_ClrVal(); // Caso contrário, LIGA Entrada
                   }
 
                   /* Regra da Válvula de Saída (EVS) */
@@ -142,7 +141,7 @@ void main(void)
                   break;
           }
       }
-  }
+  } 
   /*** Processor Expert end of main routine. DON'T MODIFY THIS CODE!!! ***/
   for(;;){}
   /*** Processor Expert end of main routine. DON'T WRITE CODE BELOW!!! ***/
